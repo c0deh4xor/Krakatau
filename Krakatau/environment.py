@@ -4,6 +4,8 @@ import zipfile
 from .classfile import ClassFile
 from .classfileformat.reader import Reader
 from .error import ClassLoaderError
+from java.stringescape import escapeString
+from Krakatau import script_util
 
 class Environment(object):
     def __init__(self):
@@ -65,7 +67,14 @@ class Environment(object):
             return False
 
     def _searchForFile(self, name):
+        if script_util.IS_WINDOWS:
+            # On Windows, back slashes count as forward slashes in an archive
+            # However, Python compares based on name alone.
+            # We end up losing files if we don't convert to forward slashes
+            name = name.replace('\\', '/')
         name += '.class'
+        if isinstance(name, str):
+            name = name.decode('utf8')
         for place in self.path:
             try:
                 archive = self._open[place]
@@ -75,19 +84,26 @@ class Environment(object):
                     with open(path, 'rb') as file_:
                         return file_.read()
                 except IOError:
-                    print 'failed to open', path.encode('utf8')
+                    encodedPath = path
+                    if isinstance(encodedPath, unicode):
+                        encodedPath = encodedPath.encode('utf8')
+                    print 'failed to open', encodedPath
             else: # zip archive
                 try:
-                    return archive.read(name)
+                    info = archive.getinfo(name)
+                    info.CRC = None
+                    return archive.read(info)
                 except KeyError:
                     pass
 
     def _loadClass(self, name):
+        if isinstance(name, unicode):
+            name = name.encode('utf8')
         print "Loading", name[:70]
         data = self._searchForFile(name)
 
         if data is None:
-            raise ClassLoaderError('ClassNotFoundException', name)
+            raise ClassLoaderError('ClassNotFoundException', escapeString(name.decode('utf8')))
 
         stream = Reader(data=data)
         new = ClassFile(stream)

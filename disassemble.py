@@ -18,17 +18,22 @@ from Krakatau.classfileformat.classdata import ClassData
 from Krakatau.assembler.disassembly import Disassembler
 
 def readArchive(archive, name):
-    with archive.open(name.decode('utf8')) as f:
+    for info in archive.infolist():
+        if info.orig_filename == name:
+            targetInfo = info
+    with archive.open(targetInfo) as f:
         return f.read()
 
 def readFile(filename):
-    with open(filename, 'rb') as f:
+    with open(filename.decode('utf8'), 'rb') as f:
         return f.read()
 
 def disassembleSub(readTarget, out, targets, roundtrip=False, outputClassName=True):
     start_time = time.time()
     with out:
         for i, target in enumerate(targets):
+            if isinstance(target, unicode):
+                target = target.encode('utf8')
             print('processing target {}, {}/{} remaining'.format(target, len(targets)-i, len(targets)))
 
             data = readTarget(target)
